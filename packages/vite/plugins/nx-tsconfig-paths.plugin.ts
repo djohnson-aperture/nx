@@ -7,6 +7,7 @@ import {
   calculateProjectBuildableDependencies,
   createTmpTsConfig,
 } from '@nx/js/src/utils/buildable-libs-utils';
+import { resolvePathsBaseUrl } from '@nx/js/src/utils/typescript/ts-config';
 import { isUsingTsSolutionSetup } from '@nx/js/src/utils/typescript/ts-solution-setup';
 import { copyFileSync, existsSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -151,7 +152,7 @@ export function nxViteTsPaths(options: nxViteTsPathsOptions = {}) {
       tsConfigPathsEsm = parsed;
 
       matchTsPathEsm = createMatchPath(
-        parsed.absoluteBaseUrl,
+        resolvePathsBaseUrl(foundTsConfigPath) ?? parsed.absoluteBaseUrl,
         parsed.paths,
         options.mainFields
       );
@@ -164,7 +165,8 @@ export function nxViteTsPaths(options: nxViteTsPathsOptions = {}) {
       if (rootLevelParsed.resultType === 'success') {
         tsConfigPathsFallback = rootLevelParsed;
         matchTsPathFallback = createMatchPath(
-          rootLevelParsed.absoluteBaseUrl,
+          resolvePathsBaseUrl(rootLevelTsConfig) ??
+            rootLevelParsed.absoluteBaseUrl,
           rootLevelParsed.paths,
           ['main', 'module']
         );

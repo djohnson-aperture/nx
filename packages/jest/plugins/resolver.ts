@@ -28,6 +28,15 @@ function getCompilerSetup(rootDir: string) {
     dirname(tsConfigPath)
   );
   const compilerOptions = config.options;
+  if (!compilerOptions.baseUrl) {
+    const {
+      resolvePathsBaseUrl,
+    } = require('@nx/js/src/utils/typescript/ts-config');
+    const resolved = resolvePathsBaseUrl(tsConfigPath);
+    if (resolved) {
+      compilerOptions.baseUrl = resolved;
+    }
+  }
   const host = ts.createCompilerHost(compilerOptions, true);
   return { compilerOptions, host };
 }

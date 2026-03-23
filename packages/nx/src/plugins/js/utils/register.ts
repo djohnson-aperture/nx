@@ -1,4 +1,5 @@
-import { join, sep } from 'path';
+import { dirname, join, resolve, sep } from 'path';
+import { readFileSync } from 'fs';
 import type { TsConfigOptions } from 'ts-node';
 import type { CompilerOptions } from 'typescript';
 import { logger, NX_PREFIX, stripIndent } from '../../../utils/logger';
@@ -386,8 +387,9 @@ export function registerTsConfigPaths(tsConfigPath): () => void {
      * can be imported and used within project
      */
     if (tsConfigResult.resultType === 'success') {
+      const baseUrl = resolvePathsBaseUrl(tsConfigPath);
       return tsconfigPaths.register({
-        baseUrl: tsConfigResult.absoluteBaseUrl,
+        baseUrl: baseUrl ?? tsConfigResult.absoluteBaseUrl,
         paths: tsConfigResult.paths,
       });
     }
@@ -551,3 +553,31 @@ export function getTsNodeCompilerOptions(compilerOptions: CompilerOptions) {
 type RemoveIndex<T> = {
   [K in keyof T as {} extends Record<K, 1> ? never : K]: T[K];
 };
+
+function resolvePathsBaseUrl(tsconfigPath: string): string | undefined {
+  return walkTsConfigChain(tsconfigPath, false);
+}
+
+function walkTsConfigChain(
+  tsconfigPath: string,
+  foundBaseUrl: boolean
+): string | undefined {
+  const absolute = resolve(tsconfigPath);
+  const dir = dirname(absolute);
+  try {
+    const raw = JSON.parse(readFileSync(absolute, 'utf-8'));
+    if (raw.compilerOptions?.baseUrl) {
+      foundBaseUrl = true;
+    }
+    if (
+      raw.compilerOptions?.paths &&
+      Object.keys(raw.compilerOptions.paths).length > 0
+    ) {
+      return foundBaseUrl ? undefined : dir;
+    }
+    if (raw.extends) {
+      return walkTsConfigChain(resolve(dir, raw.extends), foundBaseUrl);
+    }
+  } catch {}
+  return foundBaseUrl ? undefined : dir;
+}

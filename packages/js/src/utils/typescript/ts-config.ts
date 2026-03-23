@@ -1,6 +1,6 @@
 import { offsetFromRoot, Tree, updateJson, workspaceRoot } from '@nx/devkit';
-import { existsSync } from 'fs';
-import { dirname, join } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { dirname, join, resolve } from 'path';
 import type * as ts from 'typescript';
 import { ensureTypescript } from './ensure-typescript';
 
@@ -93,10 +93,54 @@ export function addTsConfigPath(
       );
     }
 
-    c.paths[importPath] = lookupPaths;
+    c.paths[importPath] = lookupPaths.map(ensureRelativePath);
 
     return json;
   });
+}
+
+function ensureRelativePath(p: string): string {
+  if (p.startsWith('./') || p.startsWith('../') || p.startsWith('/')) {
+    return p;
+  }
+  return `./${p}`;
+}
+
+/**
+ * When `baseUrl` is not set and `paths` are inherited via `extends`,
+ * tools like `tsconfig-paths` resolve from the loaded file's directory
+ * instead of the file where `paths` is defined. This walks the `extends`
+ * chain to find the correct resolution base.
+ *
+ * Returns `undefined` when `baseUrl` is set (the tools handle it correctly
+ * on their own), or the directory of the tsconfig that defines `paths`.
+ */
+export function resolvePathsBaseUrl(tsconfigPath: string): string | undefined {
+  return walkTsConfigChain(tsconfigPath, false);
+}
+
+function walkTsConfigChain(
+  tsconfigPath: string,
+  foundBaseUrl: boolean
+): string | undefined {
+  const absolute = resolve(tsconfigPath);
+  const dir = dirname(absolute);
+  try {
+    const raw = JSON.parse(readFileSync(absolute, 'utf-8'));
+    if (raw.compilerOptions?.baseUrl) {
+      foundBaseUrl = true;
+    }
+    if (
+      raw.compilerOptions?.paths &&
+      Object.keys(raw.compilerOptions.paths).length > 0
+    ) {
+      return foundBaseUrl ? undefined : dir;
+    }
+    if (raw.extends) {
+      return walkTsConfigChain(resolve(dir, raw.extends), foundBaseUrl);
+    }
+  } catch {}
+  return foundBaseUrl ? undefined : dir;
 }
 
 export function readTsConfigPaths(tsConfig?: string | ts.ParsedCommandLine) {
