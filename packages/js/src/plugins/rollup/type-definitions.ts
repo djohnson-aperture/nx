@@ -16,7 +16,10 @@ import { stripIndents } from '@nx/devkit';
  * We want a third file: `dist/index.d.ts` that re-exports from `src/index.d.ts`.
  * That way, when TSC or IDEs look for types, it will find them in the right place.
  */
-export function typeDefinitions(options: { projectRoot: string }) {
+export function typeDefinitions(options: {
+  projectRoot: string;
+  rootDir?: string;
+}) {
   return {
     name: 'dts-bundle',
     async generateBundle(_opts: unknown, bundle: OutputBundle): Promise<void> {
@@ -31,7 +34,7 @@ export function typeDefinitions(options: { projectRoot: string }) {
 
         const hasDefaultExport = file.exports.includes('default');
         const entrySourceFileName = relative(
-          options.projectRoot,
+          options.rootDir ?? options.projectRoot,
           file.facadeModuleId
         );
         const entrySourceDtsName = entrySourceFileName.replace(
