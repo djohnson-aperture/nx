@@ -1,6 +1,7 @@
 import {
   formatFiles,
   GeneratorCallback,
+  getDependencyVersionFromPackageJson,
   joinPathFragments,
   readNxJson,
   runTasksInSerial,
@@ -15,6 +16,7 @@ import {
   shouldConfigureTsSolutionSetup,
   updateTsconfigFiles,
 } from '@nx/js/src/utils/typescript/ts-solution-setup';
+import { coerce, major } from 'semver';
 import { extractTsConfigBase } from '../../utils/create-ts-config';
 import { addStyledModuleDependencies } from '../../rules/add-styled-dependencies';
 import { setupTailwindGenerator } from '../setup-tailwind/setup-tailwind';
@@ -109,6 +111,29 @@ export async function applicationGeneratorInternal(
           { response: 'No' }
         ).then((r) => r.response === 'Yes')))
       : false;
+
+  if (options.useReactRouter) {
+    const viteVersion = getDependencyVersionFromPackageJson(tree, 'vite');
+    if (viteVersion) {
+      const viteMajor = major(coerce(viteVersion));
+      if (viteMajor >= 8) {
+        throw new Error(
+          `React Router does not yet support Vite ${viteMajor}. ` +
+            `Downgrade to Vite 7 or earlier before adding a React Router application.`
+        );
+      }
+    }
+    const vitestVersion = getDependencyVersionFromPackageJson(tree, 'vitest');
+    if (vitestVersion) {
+      const vitestMajor = major(coerce(vitestVersion));
+      if (vitestMajor >= 4) {
+        throw new Error(
+          `React Router requires Vite 7, but Vitest ${vitestMajor} bundles Vite as a direct dependency which can resolve to Vite 8. ` +
+            `Downgrade to Vitest 3 before adding a React Router application.`
+        );
+      }
+    }
+  }
 
   showPossibleWarnings(tree, options);
 

@@ -1,6 +1,18 @@
-import { type Tree, ensurePackage, joinPathFragments } from '@nx/devkit';
+import {
+  type Tree,
+  ensurePackage,
+  joinPathFragments,
+  updateJson,
+} from '@nx/devkit';
+import { coerce, major } from 'semver';
 import { nxVersion } from '../../../../utils/versions';
 import { NormalizedSchema, Schema } from '../../schema';
+
+// Vitest 4.x bundles vite as a regular dependency, allowing pnpm to resolve
+// a different major (e.g. vite 8) alongside the workspace's vite 7.
+// Vitest 3.2.x declares vite as a peer dep only, so it shares the workspace
+// version. Use this for React Router projects until React Router supports Vite 8.
+const vitestV3Version = '^3.2.0';
 
 export async function setupViteConfiguration(
   tree: Tree,
@@ -47,6 +59,27 @@ export async function setupViteConfiguration(
     ...(options.useReactRouter ? { useViteV7: true } : {}),
   });
   tasks.push(viteTask);
+
+  if (options.useReactRouter) {
+    // React Router uses @react-router/dev/vite instead of @vitejs/plugin-react
+    // (same as `npx create-react-router@latest`), so remove the react plugin.
+    // Also downgrade vitest to 3.x which declares vite as a peer dep instead
+    // of a regular dep, preventing pnpm from resolving a second vite major.
+    updateJson(tree, 'package.json', (json) => {
+      delete json.devDependencies?.['@vitejs/plugin-react'];
+      delete json.devDependencies?.['@vitejs/plugin-react-swc'];
+      if (json.devDependencies?.['vitest']) {
+        const vitestMajor = major(coerce(json.devDependencies['vitest']));
+        if (vitestMajor >= 4) {
+          json.devDependencies['vitest'] = vitestV3Version;
+        }
+      }
+      if (json.devDependencies?.['@vitest/ui']) {
+        json.devDependencies['@vitest/ui'] = vitestV3Version;
+      }
+      return json;
+    });
+  }
   createOrEditViteConfig(
     tree,
     {
