@@ -399,6 +399,9 @@
     },
     {
       "path": "./e2e/nx-build"
+    },
+    {
+      "path": "./nx-dev/nx-dev-e2e"
     }
   ],
   "extends": "./tsconfig.base.json"
